@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,10 +7,30 @@ import { ProjectCard, Project } from "@/components/ui/project-card";
 import { TimelineView, TimelineEvent } from "@/components/ui/timeline-view";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
 import { StatsOverview } from "@/components/ui/stats-overview";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, LayoutDashboard, Calendar, Timer } from "lucide-react";
 import heroImage from "@/assets/hero-dashboard.jpg";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
+// Form validation schema
+const projectSchema = z.object({
+  title: z.string().min(1, "Project title is required"),
+  description: z.string().min(1, "Project description is required"),
+  deadline: z.string().min(1, "Deadline is required"),
+  status: z.enum(["active", "paused", "completed"]).default("active"),
+});
+
+type ProjectFormData = z.infer<typeof projectSchema>;
 
 const Index = () => {
+  const navigate = useNavigate();
+  
   const [projects, setProjects] = useState<Project[]>([
     {
       id: "1",
@@ -92,15 +113,13 @@ const Index = () => {
     }
   ]);
 
-  const [activeTimer, setActiveTimer] = useState<string | null>(null);
+  const [isAddProjectDialogOpen, setIsAddProjectDialogOpen] = useState(false);
 
   const handleToggleTimer = (projectId: string) => {
     setProjects(prev => prev.map(project => ({
       ...project,
       isTimerRunning: project.id === projectId ? !project.isTimerRunning : false
     })));
-    
-    setActiveTimer(prev => prev === projectId ? null : projectId);
   };
 
   const handleSessionComplete = (projectId: string, minutes: number) => {
@@ -109,6 +128,38 @@ const Index = () => {
         ? { ...project, timeSpent: project.timeSpent + minutes }
         : project
     ));
+  };
+
+  const handleViewProjectDetails = (projectId: string) => {
+    console.log('Navigating to project details:', projectId);
+    navigate(`/project/${projectId}`);
+  };
+
+  // Form setup
+  const form = useForm<ProjectFormData>({
+    resolver: zodResolver(projectSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      deadline: "",
+      status: "active",
+    },
+  });
+
+  const onSubmit = (data: ProjectFormData) => {
+    const newProject: Project = {
+      id: Date.now().toString(), // Simple ID generation
+      title: data.title,
+      description: data.description,
+      progress: 0,
+      status: data.status,
+      deadline: new Date(data.deadline),
+      timeSpent: 0,
+    };
+
+    setProjects(prev => [...prev, newProject]);
+    setIsAddProjectDialogOpen(false);
+    form.reset();
   };
 
   const activeProjects = projects.filter(p => p.status === "active").length;
@@ -133,14 +184,104 @@ const Index = () => {
             <p className="text-xl mb-8 opacity-90 animate-slide-up">
               Manage your projects, track time, and hit your deadlines with ease
             </p>
-            <Button 
-              size="lg" 
-              variant="secondary"
-              className="animate-scale-in shadow-elegant"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Create New Project
-            </Button>
+            <Dialog open={isAddProjectDialogOpen} onOpenChange={setIsAddProjectDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  size="lg" 
+                  variant="secondary"
+                  className="animate-scale-in shadow-elegant"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Create New Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Project</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter project title" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter project description" 
+                              className="min-h-[80px]"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="deadline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Deadline</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select project status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="paused">Paused</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAddProjectDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        Create Project
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -181,6 +322,7 @@ const Index = () => {
                   key={project.id}
                   project={project}
                   onToggleTimer={handleToggleTimer}
+                  onViewDetails={handleViewProjectDetails}
                 />
               ))}
             </div>
@@ -191,31 +333,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="timer" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-1">
               <PomodoroTimer
-                projectId={activeTimer || undefined}
-                projectTitle={activeTimer ? projects.find(p => p.id === activeTimer)?.title : undefined}
+                projects={projects}
                 onSessionComplete={handleSessionComplete}
               />
-              
-              {activeTimer && (
-                <Card className="shadow-card">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Active Project</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {(() => {
-                      const project = projects.find(p => p.id === activeTimer);
-                      return project ? (
-                        <ProjectCard 
-                          project={project}
-                          onToggleTimer={handleToggleTimer}
-                        />
-                      ) : null;
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </TabsContent>
         </Tabs>

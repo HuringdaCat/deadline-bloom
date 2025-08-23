@@ -63,7 +63,7 @@ export function ProjectCard({ project, onToggleTimer, onViewDetails }: ProjectCa
 
   return (
     <Card className="group relative overflow-hidden shadow-card hover:shadow-hover transition-smooth animate-fade-in">
-      <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 transition-smooth" />
+      <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 transition-smooth pointer-events-none" />
       
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -132,9 +132,12 @@ export function ProjectCard({ project, onToggleTimer, onViewDetails }: ProjectCa
 
       <CardFooter className="pt-0">
         <Button 
-          variant="outline" 
-          className="w-full transition-smooth hover:bg-primary hover:text-primary-foreground"
-          onClick={() => onViewDetails?.(project.id)}
+          variant="default" 
+          className="w-full transition-smooth hover:bg-primary/90"
+          onClick={() => {
+            console.log('View Details clicked for project:', project.id);
+            onViewDetails?.(project.id);
+          }}
         >
           View Details
         </Button>
