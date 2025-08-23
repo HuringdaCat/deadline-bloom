@@ -52,6 +52,24 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				info: {
+					DEFAULT: 'hsl(var(--info))',
+					foreground: 'hsl(var(--info-foreground))'
+				},
+				status: {
+					active: 'hsl(var(--status-active))',
+					paused: 'hsl(var(--status-paused))',
+					completed: 'hsl(var(--status-completed))',
+					overdue: 'hsl(var(--status-overdue))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -85,10 +103,31 @@ export default {
 						height: '0'
 					}
 				}
+				pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'fade-in': 'fadeIn 0.5s ease-out',
+				'slide-up': 'slideUp 0.3s ease-out',
+				'scale-in': 'scaleIn 0.2s ease-out'
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'fade-in': 'fadeIn 0.5s ease-out',
+				'slide-up': 'slideUp 0.3s ease-out',
+				'scale-in': 'scaleIn 0.2s ease-out'
+			},
+			backgroundImage: {
+				'gradient-primary': 'var(--primary-gradient)',
+				'gradient-secondary': 'var(--secondary-gradient)'
+			},
+			boxShadow: {
+				'elegant': 'var(--shadow-elegant)',
+				'card': 'var(--shadow-card)',
+				'hover': 'var(--shadow-hover)'
+			},
+			transitionTimingFunction: {
+				'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+				'bounce': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)'
 			}
 		}
 	},
