@@ -3,7 +3,30 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProjectCard, Project } from "@/components/ui/project-card";
+import { ProjectCard } from "@/components/ui/project-card";
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: "todo" | "in-progress" | "completed";
+  priority: "low" | "medium" | "high";
+  dueDate?: Date;
+  timeSpent: number;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  status: "active" | "paused" | "completed" | "overdue";
+  deadline: Date;
+  timeSpent: number;
+  tasks: Task[];
+}
 import { TimelineView, TimelineEvent } from "@/components/ui/timeline-view";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
 import { StatsOverview } from "@/components/ui/stats-overview";
@@ -40,6 +63,39 @@ const Index = () => {
       status: "active",
       deadline: new Date("2024-09-15"),
       timeSpent: 720, // 12 hours
+      tasks: [
+        {
+          id: "1",
+          title: "Design User Interface",
+          description: "Create wireframes and mockups for the main pages",
+          status: "completed" as const,
+          priority: "high" as const,
+          dueDate: new Date("2024-08-20"),
+          timeSpent: 240,
+          createdAt: new Date("2024-08-01"),
+          completedAt: new Date("2024-08-20"),
+        },
+        {
+          id: "2",
+          title: "Implement Authentication",
+          description: "Set up user registration and login functionality",
+          status: "in-progress" as const,
+          priority: "high" as const,
+          dueDate: new Date("2024-08-25"),
+          timeSpent: 180,
+          createdAt: new Date("2024-08-15"),
+        },
+        {
+          id: "3",
+          title: "Payment Integration",
+          description: "Integrate Stripe payment gateway",
+          status: "todo" as const,
+          priority: "medium" as const,
+          dueDate: new Date("2024-09-01"),
+          timeSpent: 0,
+          createdAt: new Date("2024-08-20"),
+        },
+      ]
     },
     {
       id: "2", 
@@ -49,6 +105,29 @@ const Index = () => {
       status: "active",
       deadline: new Date("2024-09-01"),
       timeSpent: 480, // 8 hours
+      tasks: [
+        {
+          id: "4",
+          title: "Wireframe Design",
+          description: "Create wireframes for all app screens",
+          status: "completed" as const,
+          priority: "high" as const,
+          dueDate: new Date("2024-08-15"),
+          timeSpent: 120,
+          createdAt: new Date("2024-08-01"),
+          completedAt: new Date("2024-08-15"),
+        },
+        {
+          id: "5",
+          title: "Visual Design",
+          description: "Create high-fidelity mockups",
+          status: "in-progress" as const,
+          priority: "high" as const,
+          dueDate: new Date("2024-08-30"),
+          timeSpent: 240,
+          createdAt: new Date("2024-08-10"),
+        },
+      ]
     },
     {
       id: "3",
@@ -58,6 +137,7 @@ const Index = () => {
       status: "completed",
       deadline: new Date("2024-08-20"),
       timeSpent: 360, // 6 hours
+      tasks: []
     },
     {
       id: "4",
@@ -67,10 +147,11 @@ const Index = () => {
       status: "paused",
       deadline: new Date("2024-08-25"),
       timeSpent: 180, // 3 hours
+      tasks: []
     }
   ]);
 
-  const [timelineEvents] = useState<TimelineEvent[]>([
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([
     {
       id: "1",
       projectId: "1",
@@ -122,12 +203,35 @@ const Index = () => {
     })));
   };
 
-  const handleSessionComplete = (projectId: string, minutes: number) => {
+  const handleSessionComplete = (projectId: string, minutes: number, taskId?: string) => {
+    // Update project time spent
     setProjects(prev => prev.map(project => 
       project.id === projectId 
         ? { ...project, timeSpent: project.timeSpent + minutes }
         : project
     ));
+
+    // Add focus session to timeline
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      const task = project.tasks?.find(t => t.id === taskId);
+      const newEvent: TimelineEvent = {
+        id: Date.now().toString(),
+        projectId: projectId,
+        projectTitle: project.title,
+        title: task 
+          ? `Focus Session: ${task.title}`
+          : "Focus Session",
+        type: "milestone",
+        date: new Date(),
+        status: "completed",
+        description: task 
+          ? `Completed ${minutes}-minute focus session on task: ${task.title}`
+          : `Completed ${minutes}-minute focus session`
+      };
+
+      setTimelineEvents(prev => [newEvent, ...prev]);
+    }
   };
 
   const handleViewProjectDetails = (projectId: string) => {

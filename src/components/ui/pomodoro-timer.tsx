@@ -4,18 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Play, Pause, Square, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface Task {
+  id: string;
+  title: string;
+  status: "todo" | "in-progress" | "completed";
+}
 
 interface Project {
   id: string;
   title: string;
   status: string;
+  tasks?: Task[];
 }
 
 interface PomodoroTimerProps {
   projects: Project[];
-  onSessionComplete?: (projectId: string, minutes: number) => void;
+  onSessionComplete?: (projectId: string, minutes: number, taskId?: string) => void;
   className?: string;
 }
 
@@ -31,6 +39,9 @@ export function PomodoroTimer({
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isProjectSelectionOpen, setIsProjectSelectionOpen] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [isTaskAttributionOpen, setIsTaskAttributionOpen] = useState(false);
+  const [completedSessionMinutes, setCompletedSessionMinutes] = useState<number>(0);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
 
   const workDuration = 25 * 60; // 25 minutes
   const breakDuration = 5 * 60; // 5 minutes
@@ -62,7 +73,9 @@ export function PomodoroTimer({
       setSessionCount(newSessionCount);
       
       if (selectedProject) {
-        onSessionComplete?.(selectedProject.id, 25);
+        // Show task attribution dialog for work sessions
+        setCompletedSessionMinutes(25);
+        setIsTaskAttributionOpen(true);
       }
       
       // Switch to break
@@ -96,6 +109,24 @@ export function PomodoroTimer({
     }
   };
 
+  const handleTaskAttribution = () => {
+    if (selectedProject && completedSessionMinutes > 0) {
+      onSessionComplete?.(selectedProject.id, completedSessionMinutes, selectedTaskId || undefined);
+    }
+    setIsTaskAttributionOpen(false);
+    setSelectedTaskId("");
+    setCompletedSessionMinutes(0);
+  };
+
+  const handleSkipTaskAttribution = () => {
+    if (selectedProject && completedSessionMinutes > 0) {
+      onSessionComplete?.(selectedProject.id, completedSessionMinutes);
+    }
+    setIsTaskAttributionOpen(false);
+    setSelectedTaskId("");
+    setCompletedSessionMinutes(0);
+  };
+
   const toggleTimer = () => {
     if (isRunning) {
       setIsRunning(false);
@@ -119,7 +150,8 @@ export function PomodoroTimer({
     if (mode === "work" && selectedProject && sessionStartTime) {
       const elapsedMinutes = Math.floor((Date.now() - sessionStartTime) / (1000 * 60));
       if (elapsedMinutes > 0) {
-        onSessionComplete?.(selectedProject.id, elapsedMinutes);
+        setCompletedSessionMinutes(elapsedMinutes);
+        setIsTaskAttributionOpen(true);
       }
     }
     
@@ -272,6 +304,60 @@ export function PomodoroTimer({
                 onClick={() => setIsProjectSelectionOpen(false)}
               >
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Attribution Dialog */}
+      <Dialog open={isTaskAttributionOpen} onOpenChange={setIsTaskAttributionOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Attribute Focus Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Great work! You completed a {completedSessionMinutes}-minute focus session on "{selectedProject?.title}".
+              Which task were you working on?
+            </p>
+            
+            {selectedProject?.tasks && selectedProject.tasks.length > 0 ? (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Select Task (Optional)</Label>
+                <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a task or skip" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific task</SelectItem>
+                    {selectedProject.tasks
+                      .filter(task => task.status !== "completed")
+                      .map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No tasks available for this project.
+              </p>
+            )}
+            
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={handleSkipTaskAttribution}
+              >
+                Skip
+              </Button>
+              <Button
+                onClick={handleTaskAttribution}
+              >
+                Save Session
               </Button>
             </div>
           </div>

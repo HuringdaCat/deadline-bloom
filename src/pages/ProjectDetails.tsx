@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TimelineView, TimelineEvent } from "@/components/ui/timeline-view";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
 import { 
@@ -23,7 +24,9 @@ import {
   Clock as ClockIcon,
   Target,
   BarChart3,
-  ListTodo
+  ListTodo,
+  Edit,
+  MoreHorizontal
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -81,6 +84,8 @@ const ProjectDetails = () => {
   // Mock project data - in a real app, this would come from an API or context
   const [project, setProject] = useState<Project | null>(null);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
 
   // Forms
@@ -219,6 +224,40 @@ const ProjectDetails = () => {
     taskForm.reset();
   };
 
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    taskForm.reset({
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      dueDate: task.dueDate ? task.dueDate.toISOString().split('T')[0] : "",
+    });
+    setIsEditTaskDialogOpen(true);
+  };
+
+  const handleUpdateTask = (data: TaskFormData) => {
+    if (!project || !editingTask) return;
+
+    const updatedTask: Task = {
+      ...editingTask,
+      title: data.title,
+      description: data.description || "",
+      priority: data.priority,
+      dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+    };
+
+    setProject(prev => prev ? {
+      ...prev,
+      tasks: prev.tasks.map(task => 
+        task.id === editingTask.id ? updatedTask : task
+      )
+    } : null);
+
+    setIsEditTaskDialogOpen(false);
+    setEditingTask(null);
+    taskForm.reset();
+  };
+
   const handleAddEvent = (data: TimelineEventFormData) => {
     if (!project) return;
 
@@ -259,11 +298,47 @@ const ProjectDetails = () => {
     } : null);
   };
 
-  const handleSessionComplete = (projectId: string, minutes: number) => {
-    setProject(prev => prev ? {
-      ...prev,
-      timeSpent: prev.timeSpent + minutes
-    } : null);
+  const handleSessionComplete = (projectId: string, minutes: number, taskId?: string) => {
+    setProject(prev => {
+      if (!prev) return null;
+      
+      // Update project time spent
+      const updatedProject = {
+        ...prev,
+        timeSpent: prev.timeSpent + minutes
+      };
+
+      // Update task time spent if taskId is provided
+      if (taskId) {
+        updatedProject.tasks = prev.tasks.map(task => 
+          task.id === taskId 
+            ? { ...task, timeSpent: task.timeSpent + minutes }
+            : task
+        );
+      }
+
+      // Add focus session to timeline
+      const task = prev.tasks.find(t => t.id === taskId);
+      const newEvent: TimelineEvent = {
+        id: Date.now().toString(),
+        projectId: projectId,
+        projectTitle: prev.title,
+        title: task 
+          ? `Focus Session: ${task.title}`
+          : "Focus Session",
+        type: "milestone",
+        date: new Date(),
+        status: "completed",
+        description: task 
+          ? `Completed ${minutes}-minute focus session on task: ${task.title}`
+          : `Completed ${minutes}-minute focus session`
+      };
+
+      return {
+        ...updatedProject,
+        timelineEvents: [newEvent, ...prev.timelineEvents]
+      };
+    });
   };
 
   const formatTimeSpent = (minutes: number) => {
@@ -527,58 +602,164 @@ const ProjectDetails = () => {
               </Dialog>
             </div>
 
-            <div className="space-y-4">
-              {project.tasks.map((task) => (
-                <Card key={task.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <Checkbox
-                          checked={task.status === "completed"}
-                          onCheckedChange={(checked) => 
-                            handleTaskStatusChange(task.id, checked ? "completed" : "todo")
-                          }
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className={cn(
-                              "font-medium",
-                              task.status === "completed" && "line-through text-muted-foreground"
-                            )}>
-                              {task.title}
-                            </h3>
-                            <Badge className={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            {task.status === "in-progress" && (
-                              <Badge variant="secondary">In Progress</Badge>
-                            )}
-                          </div>
-                          {task.description && (
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {task.description}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTimeSpent(task.timeSpent)}
-                            </span>
-                            {task.dueDate && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {task.dueDate.toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+            {/* Edit Task Dialog */}
+            <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Edit Task</DialogTitle>
+                </DialogHeader>
+                <Form {...taskForm}>
+                  <form onSubmit={taskForm.handleSubmit(handleUpdateTask)} className="space-y-4">
+                    <FormField
+                      control={taskForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Task Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter task title" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={taskForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter task description" 
+                              className="min-h-[80px]"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={taskForm.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={taskForm.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Due Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditTaskDialogOpen(false);
+                          setEditingTask(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        Update Task
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
+            <div className="space-y-4">
+               {project.tasks.map((task) => (
+                 <Card key={task.id} className="hover:shadow-md transition-shadow">
+                   <CardContent className="p-6">
+                     <div className="flex items-start justify-between">
+                       <div className="flex items-start gap-3 flex-1">
+                         <Checkbox
+                           checked={task.status === "completed"}
+                           onCheckedChange={(checked) => 
+                             handleTaskStatusChange(task.id, checked ? "completed" : "todo")
+                           }
+                           className="mt-1"
+                         />
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-2">
+                             <h3 className={cn(
+                               "font-medium",
+                               task.status === "completed" && "line-through text-muted-foreground"
+                             )}>
+                               {task.title}
+                             </h3>
+                             <Badge className={getPriorityColor(task.priority)}>
+                               {task.priority}
+                             </Badge>
+                             {task.status === "in-progress" && (
+                               <Badge variant="secondary">In Progress</Badge>
+                             )}
+                           </div>
+                           {task.description && (
+                             <p className="text-sm text-muted-foreground mb-2">
+                               {task.description}
+                             </p>
+                           )}
+                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                             <span className="flex items-center gap-1">
+                               <Clock className="h-3 w-3" />
+                               {formatTimeSpent(task.timeSpent)}
+                             </span>
+                             {task.dueDate && (
+                               <span className="flex items-center gap-1">
+                                 <Calendar className="h-3 w-3" />
+                                 {task.dueDate.toLocaleDateString()}
+                               </span>
+                             )}
+                           </div>
+                         </div>
+                       </div>
+                       <DropdownMenu>
+                         <DropdownMenuTrigger asChild>
+                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                             <MoreHorizontal className="h-4 w-4" />
+                           </Button>
+                         </DropdownMenuTrigger>
+                         <DropdownMenuContent align="end">
+                           <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                             <Edit className="h-4 w-4 mr-2" />
+                             Edit Task
+                           </DropdownMenuItem>
+                         </DropdownMenuContent>
+                       </DropdownMenu>
+                     </div>
+                   </CardContent>
+                 </Card>
+               ))}
+             </div>
           </TabsContent>
 
           {/* Timeline Tab */}
