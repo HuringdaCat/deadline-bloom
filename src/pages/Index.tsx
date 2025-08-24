@@ -4,30 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectCard } from "@/components/ui/project-card";
+import { useProjects } from "@/contexts/ProjectContext";
+import { DataManagement } from "@/components/ui/data-management";
+import { AuthModal } from "@/components/ui/auth-modal";
+import type { Project } from "@/contexts/ProjectContext";
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: "todo" | "in-progress" | "completed";
-  priority: "low" | "medium" | "high";
-  dueDate?: Date;
-  timeSpent: number;
-  createdAt: Date;
-  completedAt?: Date;
-}
 
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  progress: number;
-  status: "active" | "paused" | "completed" | "overdue";
-  deadline: Date;
-  timeSpent: number;
-  tasks: Task[];
-}
-import { TimelineView, TimelineEvent } from "@/components/ui/timeline-view";
+import { TimelineView } from "@/components/ui/timeline-view";
+import type { TimelineEvent } from "@/contexts/ProjectContext";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
 import { StatsOverview } from "@/components/ui/stats-overview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -35,7 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, LayoutDashboard, Calendar, Timer } from "lucide-react";
+import { Plus, LayoutDashboard, Calendar, Timer, Database, User, LogIn } from "lucide-react";
 import heroImage from "@/assets/hero-dashboard.jpg";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,147 +37,8 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 
 const Index = () => {
   const navigate = useNavigate();
+  const { projects, setProjects, timelineEvents, setTimelineEvents } = useProjects();
   
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: "1",
-      title: "E-commerce Platform",
-      description: "Building a modern online shopping platform with React and Node.js",
-      progress: 75,
-      status: "active",
-      deadline: new Date("2024-09-15"),
-      timeSpent: 720, // 12 hours
-      tasks: [
-        {
-          id: "1",
-          title: "Design User Interface",
-          description: "Create wireframes and mockups for the main pages",
-          status: "completed" as const,
-          priority: "high" as const,
-          dueDate: new Date("2024-08-20"),
-          timeSpent: 240,
-          createdAt: new Date("2024-08-01"),
-          completedAt: new Date("2024-08-20"),
-        },
-        {
-          id: "2",
-          title: "Implement Authentication",
-          description: "Set up user registration and login functionality",
-          status: "in-progress" as const,
-          priority: "high" as const,
-          dueDate: new Date("2024-08-25"),
-          timeSpent: 180,
-          createdAt: new Date("2024-08-15"),
-        },
-        {
-          id: "3",
-          title: "Payment Integration",
-          description: "Integrate Stripe payment gateway",
-          status: "todo" as const,
-          priority: "medium" as const,
-          dueDate: new Date("2024-09-01"),
-          timeSpent: 0,
-          createdAt: new Date("2024-08-20"),
-        },
-      ]
-    },
-    {
-      id: "2", 
-      title: "Mobile App Design",
-      description: "UI/UX design for a fitness tracking mobile application",
-      progress: 40,
-      status: "active",
-      deadline: new Date("2024-09-01"),
-      timeSpent: 480, // 8 hours
-      tasks: [
-        {
-          id: "4",
-          title: "Wireframe Design",
-          description: "Create wireframes for all app screens",
-          status: "completed" as const,
-          priority: "high" as const,
-          dueDate: new Date("2024-08-15"),
-          timeSpent: 120,
-          createdAt: new Date("2024-08-01"),
-          completedAt: new Date("2024-08-15"),
-        },
-        {
-          id: "5",
-          title: "Visual Design",
-          description: "Create high-fidelity mockups",
-          status: "in-progress" as const,
-          priority: "high" as const,
-          dueDate: new Date("2024-08-30"),
-          timeSpent: 240,
-          createdAt: new Date("2024-08-10"),
-        },
-      ]
-    },
-    {
-      id: "3",
-      title: "Portfolio Website",
-      description: "Personal portfolio showcasing recent projects and skills",
-      progress: 100,
-      status: "completed",
-      deadline: new Date("2024-08-20"),
-      timeSpent: 360, // 6 hours
-      tasks: []
-    },
-    {
-      id: "4",
-      title: "API Documentation",
-      description: "Comprehensive documentation for the company's REST API",
-      progress: 20,
-      status: "paused",
-      deadline: new Date("2024-08-25"),
-      timeSpent: 180, // 3 hours
-      tasks: []
-    }
-  ]);
-
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([
-    {
-      id: "1",
-      projectId: "1",
-      projectTitle: "E-commerce Platform",
-      title: "MVP Launch",
-      type: "deadline",
-      date: new Date("2024-09-15"),
-      status: "upcoming",
-      description: "Launch minimum viable product to production"
-    },
-    {
-      id: "2",
-      projectId: "2",
-      projectTitle: "Mobile App Design",
-      title: "Design Review",
-      type: "meeting",
-      date: new Date("2024-09-01"),
-      status: "upcoming",
-      description: "Final design review with stakeholders"
-    },
-    {
-      id: "3",
-      projectId: "1",
-      projectTitle: "E-commerce Platform",
-      title: "Payment Integration",
-      type: "milestone",
-      date: new Date("2024-08-28"),
-      status: "upcoming",
-      description: "Complete Stripe payment gateway integration"
-    },
-    {
-      id: "4",
-      projectId: "4",
-      projectTitle: "API Documentation",
-      title: "Documentation Review",
-      type: "review",
-      date: new Date("2024-08-25"),
-      status: "overdue",
-      description: "Technical review of API documentation"
-    }
-  ]);
-
   const [isAddProjectDialogOpen, setIsAddProjectDialogOpen] = useState(false);
 
   const handleToggleTimer = (projectId: string) => {
@@ -404,7 +249,7 @@ const Index = () => {
 
         {/* Main Tabs */}
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-96">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
@@ -416,6 +261,10 @@ const Index = () => {
             <TabsTrigger value="timer" className="flex items-center gap-2">
               <Timer className="h-4 w-4" />
               Timer
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -442,6 +291,37 @@ const Index = () => {
                 projects={projects}
                 onSessionComplete={handleSessionComplete}
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <DataManagement />
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Account & Sync
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AuthModal>
+                      <Button className="w-full">
+                        <LogIn className="h-4 w-4 mr-2" />
+                        Sign In / Sign Up
+                      </Button>
+                    </AuthModal>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      • Sign in to sync your data across devices
+                      <br />
+                      • Your data is always saved locally by default
+                      <br />
+                      • Export your data regularly for backup
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
