@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { TimelineView, TimelineEvent } from "@/components/ui/timeline-view";
+import { TimelineView } from "@/components/ui/timeline-view";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
+import { useProjects } from "@/contexts/ProjectContext";
+import type { Project, Task, TimelineEvent } from "@/contexts/ProjectContext";
 import { 
   ArrowLeft, 
   Plus, 
@@ -33,29 +35,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { cn } from "@/lib/utils";
 
-// Task interface
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: "todo" | "in-progress" | "completed";
-  priority: "low" | "medium" | "high";
-  dueDate?: Date;
-  timeSpent: number; // in minutes
-  createdAt: Date;
-  completedAt?: Date;
-}
-
 // Project interface (extended)
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  progress: number;
-  status: "active" | "paused" | "completed" | "overdue";
-  deadline: Date;
-  timeSpent: number; // in minutes
-  tasks: Task[];
+interface ExtendedProject extends Project {
   timelineEvents: TimelineEvent[];
 }
 
@@ -80,9 +61,9 @@ type TimelineEventFormData = z.infer<typeof timelineEventSchema>;
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { projects, setProjects, timelineEvents, setTimelineEvents } = useProjects();
   
-  // Mock project data - in a real app, this would come from an API or context
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -109,97 +90,23 @@ const ProjectDetails = () => {
     },
   });
 
-  // Mock data initialization
+  // Find project from context
   useEffect(() => {
     if (projectId) {
-      // Mock project data - in a real app, fetch from API
-      const mockProject: Project = {
-        id: projectId,
-        title: "E-commerce Platform",
-        description: "Building a modern online shopping platform with React and Node.js",
-        progress: 75,
-        status: "active",
-        deadline: new Date("2024-09-15"),
-        timeSpent: 720, // 12 hours
-        tasks: [
-          {
-            id: "1",
-            title: "Design User Interface",
-            description: "Create wireframes and mockups for the main pages",
-            status: "completed",
-            priority: "high",
-            dueDate: new Date("2024-08-20"),
-            timeSpent: 240,
-            createdAt: new Date("2024-08-01"),
-            completedAt: new Date("2024-08-20"),
-          },
-          {
-            id: "2",
-            title: "Implement Authentication",
-            description: "Set up user registration and login functionality",
-            status: "in-progress",
-            priority: "high",
-            dueDate: new Date("2024-08-25"),
-            timeSpent: 180,
-            createdAt: new Date("2024-08-15"),
-          },
-          {
-            id: "3",
-            title: "Payment Integration",
-            description: "Integrate Stripe payment gateway",
-            status: "todo",
-            priority: "medium",
-            dueDate: new Date("2024-09-01"),
-            timeSpent: 0,
-            createdAt: new Date("2024-08-20"),
-          },
-          {
-            id: "4",
-            title: "Product Catalog",
-            description: "Build product listing and detail pages",
-            status: "todo",
-            priority: "medium",
-            dueDate: new Date("2024-08-30"),
-            timeSpent: 0,
-            createdAt: new Date("2024-08-18"),
-          },
-        ],
-        timelineEvents: [
-          {
-            id: "1",
-            projectId: projectId,
-            projectTitle: "E-commerce Platform",
-            title: "MVP Launch",
-            type: "deadline",
-            date: new Date("2024-09-15"),
-            status: "upcoming",
-            description: "Launch minimum viable product to production"
-          },
-          {
-            id: "2",
-            projectId: projectId,
-            projectTitle: "E-commerce Platform",
-            title: "Payment Integration Complete",
-            type: "milestone",
-            date: new Date("2024-09-01"),
-            status: "upcoming",
-            description: "Complete Stripe payment gateway integration"
-          },
-          {
-            id: "3",
-            projectId: projectId,
-            projectTitle: "E-commerce Platform",
-            title: "Design Review",
-            type: "meeting",
-            date: new Date("2024-08-20"),
-            status: "completed",
-            description: "Final design review with stakeholders"
-          },
-        ],
-      };
-      setProject(mockProject);
+      const foundProject = projects.find(p => p.id === projectId);
+      if (foundProject) {
+        // Get timeline events for this project
+        const projectEvents = timelineEvents.filter(e => e.projectId === projectId);
+        setProject({
+          ...foundProject,
+          timelineEvents: projectEvents
+        });
+      } else {
+        // Project not found, redirect to home
+        navigate('/');
+      }
     }
-  }, [projectId]);
+  }, [projectId, projects, timelineEvents, navigate]);
 
   const handleAddTask = (data: TaskFormData) => {
     if (!project) return;
@@ -215,6 +122,15 @@ const ProjectDetails = () => {
       createdAt: new Date(),
     };
 
+    // Update project in context
+    const updatedProjects = projects.map(p => 
+      p.id === project.id 
+        ? { ...p, tasks: [...p.tasks, newTask] }
+        : p
+    );
+    setProjects(updatedProjects);
+
+    // Update local project state
     setProject(prev => prev ? {
       ...prev,
       tasks: [...prev.tasks, newTask]
@@ -246,6 +162,17 @@ const ProjectDetails = () => {
       dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
     };
 
+    // Update project in context
+    const updatedProjects = projects.map(p => 
+      p.id === project.id 
+        ? { ...p, tasks: p.tasks.map(task => 
+            task.id === editingTask.id ? updatedTask : task
+          )}
+        : p
+    );
+    setProjects(updatedProjects);
+
+    // Update local project state
     setProject(prev => prev ? {
       ...prev,
       tasks: prev.tasks.map(task => 
@@ -272,6 +199,10 @@ const ProjectDetails = () => {
       status: "upcoming",
     };
 
+    // Add to global timeline events
+    setTimelineEvents([...timelineEvents, newEvent]);
+
+    // Update local project state
     setProject(prev => prev ? {
       ...prev,
       timelineEvents: [...prev.timelineEvents, newEvent]
@@ -284,14 +215,31 @@ const ProjectDetails = () => {
   const handleTaskStatusChange = (taskId: string, newStatus: Task["status"]) => {
     if (!project) return;
 
+    const updatedTask = {
+      status: newStatus,
+      completedAt: newStatus === "completed" ? new Date() : undefined
+    };
+
+    // Update project in context
+    const updatedProjects = projects.map(p => 
+      p.id === project.id 
+        ? { ...p, tasks: p.tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, ...updatedTask }
+              : task
+          )}
+        : p
+    );
+    setProjects(updatedProjects);
+
+    // Update local project state
     setProject(prev => prev ? {
       ...prev,
       tasks: prev.tasks.map(task => 
         task.id === taskId 
           ? { 
               ...task, 
-              status: newStatus,
-              completedAt: newStatus === "completed" ? new Date() : undefined
+              ...updatedTask
             }
           : task
       )
@@ -299,46 +247,55 @@ const ProjectDetails = () => {
   };
 
   const handleSessionComplete = (projectId: string, minutes: number, taskId?: string) => {
-    setProject(prev => {
-      if (!prev) return null;
-      
-      // Update project time spent
-      const updatedProject = {
-        ...prev,
-        timeSpent: prev.timeSpent + minutes
-      };
+    if (!project) return;
+    
+    // Update project time spent in context
+    const updatedProjects = projects.map(p => 
+      p.id === projectId 
+        ? { 
+            ...p, 
+            timeSpent: p.timeSpent + minutes,
+            tasks: taskId ? p.tasks.map(task => 
+              task.id === taskId 
+                ? { ...task, timeSpent: task.timeSpent + minutes }
+                : task
+            ) : p.tasks
+          }
+        : p
+    );
+    setProjects(updatedProjects);
 
-      // Update task time spent if taskId is provided
-      if (taskId) {
-        updatedProject.tasks = prev.tasks.map(task => 
-          task.id === taskId 
-            ? { ...task, timeSpent: task.timeSpent + minutes }
-            : task
-        );
-      }
+    // Add focus session to timeline
+    const task = project.tasks.find(t => t.id === taskId);
+    const newEvent: TimelineEvent = {
+      id: Date.now().toString(),
+      projectId: projectId,
+      projectTitle: project.title,
+      title: task 
+        ? `Focus Session: ${task.title}`
+        : "Focus Session",
+      type: "milestone",
+      date: new Date(),
+      status: "completed",
+      description: task 
+        ? `Completed ${minutes}-minute focus session on task: ${task.title}`
+        : `Completed ${minutes}-minute focus session`
+    };
 
-      // Add focus session to timeline
-      const task = prev.tasks.find(t => t.id === taskId);
-      const newEvent: TimelineEvent = {
-        id: Date.now().toString(),
-        projectId: projectId,
-        projectTitle: prev.title,
-        title: task 
-          ? `Focus Session: ${task.title}`
-          : "Focus Session",
-        type: "milestone",
-        date: new Date(),
-        status: "completed",
-        description: task 
-          ? `Completed ${minutes}-minute focus session on task: ${task.title}`
-          : `Completed ${minutes}-minute focus session`
-      };
+    // Add to global timeline events
+    setTimelineEvents([...timelineEvents, newEvent]);
 
-      return {
-        ...updatedProject,
-        timelineEvents: [newEvent, ...prev.timelineEvents]
-      };
-    });
+    // Update local project state
+    setProject(prev => prev ? {
+      ...prev,
+      timeSpent: prev.timeSpent + minutes,
+      tasks: taskId ? prev.tasks.map(task => 
+        task.id === taskId 
+          ? { ...task, timeSpent: task.timeSpent + minutes }
+          : task
+      ) : prev.tasks,
+      timelineEvents: [newEvent, ...prev.timelineEvents]
+    } : null);
   };
 
   const formatTimeSpent = (minutes: number) => {
