@@ -8,7 +8,7 @@ import { Download, Upload, Trash2, Database, AlertTriangle, CheckCircle } from '
 import { useProjects } from '@/contexts/ProjectContext';
 
 export function DataManagement() {
-  const { exportUserData, importUserData, clearAllData, projects, timelineEvents } = useProjects();
+  const { exportUserData, importUserData, clearAllData, loadExampleData, projects, timelineEvents } = useProjects();
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -54,6 +54,10 @@ export function DataManagement() {
   const handleClearData = () => {
     clearAllData();
     setIsClearDialogOpen(false);
+  };
+
+  const handleLoadExampleData = () => {
+    loadExampleData();
   };
 
   const getStatusIcon = () => {
@@ -111,6 +115,15 @@ export function DataManagement() {
             >
               <Download className="h-4 w-4" />
               Export Data
+            </Button>
+
+            <Button
+              onClick={handleLoadExampleData}
+              className="flex items-center gap-2"
+              variant="outline"
+            >
+              <Database className="h-4 w-4" />
+              Load Examples
             </Button>
 
             <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>

@@ -14,7 +14,7 @@ import { TimelineView } from "@/components/ui/timeline-view";
 import type { TimelineEvent } from "@/contexts/ProjectContext";
 import { PomodoroTimer } from "@/components/ui/pomodoro-timer";
 import { StatsOverview } from "@/components/ui/stats-overview";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,6 +104,7 @@ const Index = () => {
       status: data.status,
       deadline: new Date(data.deadline),
       timeSpent: 0,
+      tasks: [], // Initialize with empty tasks array
     };
 
     setProjects(prev => [...prev, newProject]);
@@ -144,10 +145,13 @@ const Index = () => {
                   Create New Project
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Project</DialogTitle>
-                </DialogHeader>
+                             <DialogContent className="sm:max-w-[425px]">
+                 <DialogHeader>
+                   <DialogTitle>Create New Project</DialogTitle>
+                   <DialogDescription>
+                     Add a new project to your dashboard. Fill in the details below to get started.
+                   </DialogDescription>
+                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField

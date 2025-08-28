@@ -40,21 +40,32 @@ interface ProjectData {
   timelineEvents: TimelineEvent[];
   lastUpdated: string;
   version: string;
+  intentionallyCleared?: boolean;
 }
 
 interface ProjectContextType {
   projects: Project[];
-  setProjects: (projects: Project[]) => void;
+  setProjects: (projects: Project[] | ((prev: Project[]) => Project[])) => void;
   timelineEvents: TimelineEvent[];
-  setTimelineEvents: (events: TimelineEvent[]) => void;
+  setTimelineEvents: (events: TimelineEvent[] | ((prev: TimelineEvent[]) => TimelineEvent[])) => void;
   exportUserData: () => void;
   importUserData: (file: File) => Promise<boolean>;
   clearAllData: () => void;
+  loadExampleData: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const defaultData: ProjectData = {
+// Empty initial state for new users
+const emptyData: ProjectData = {
+  projects: [],
+  timelineEvents: [],
+  lastUpdated: new Date().toISOString(),
+  version: "1.0.0"
+};
+
+// Example data for demonstration purposes
+const exampleData: ProjectData = {
   projects: [
     {
       id: "1",
@@ -198,26 +209,42 @@ const defaultData: ProjectData = {
 };
 
 export const ProjectProvider = ({ children }: { children: React.ReactNode }) => {
-  const [projectData, setProjectData] = useLocalStorage<ProjectData>('deadline-bloom-data', defaultData);
+  const [projectData, setProjectData] = useLocalStorage<ProjectData>('deadline-bloom-data', emptyData);
 
-  // Ensure projectData has the required structure, fallback to defaultData if not
-  const safeProjectData = projectData && 
-    Array.isArray(projectData.projects) && 
-    Array.isArray(projectData.timelineEvents) 
-    ? projectData 
-    : defaultData;
+  // Helper function to check if data should be initialized with defaults
+  const shouldInitializeWithDefaults = (data: any): boolean => {
+    // Don't initialize with defaults if data was intentionally cleared
+    if (data && data.intentionallyCleared) {
+      return false;
+    }
+    
+    // Only initialize if data is completely missing or malformed
+    return !data || 
+           typeof data !== 'object' || 
+           !('projects' in data) || 
+           !('timelineEvents' in data) ||
+           !Array.isArray(data.projects) ||
+           !Array.isArray(data.timelineEvents) ||
+           !('lastUpdated' in data) ||
+           !('version' in data);
+  };
+
+  // Ensure projectData has the required structure, fallback to emptyData if not
+  const safeProjectData = shouldInitializeWithDefaults(projectData) ? emptyData : projectData;
 
   // Convert date strings back to Date objects when loading from localStorage
   const projects = safeProjectData.projects.map(project => ({
     ...project,
     deadline: new Date(project.deadline),
-    tasks: project.tasks.map(task => ({
+    tasks: (project.tasks || []).map(task => ({
       ...task,
       dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
       createdAt: new Date(task.createdAt),
       completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
     }))
   }));
+
+
 
   const timelineEvents = safeProjectData.timelineEvents.map(event => ({
     ...event,
@@ -226,26 +253,36 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
 
   // Ensure data is properly initialized
   useEffect(() => {
-    if (!projectData || !projectData.projects || !projectData.timelineEvents) {
-      console.log('Initializing project data with defaults');
-      setProjectData(defaultData);
+    // Only initialize with defaults if projectData is null/undefined or missing required properties
+    // Don't re-initialize if we have valid data structure (even if arrays are empty)
+    if (shouldInitializeWithDefaults(projectData)) {
+      setProjectData(emptyData);
     }
-  }, [projectData, setProjectData]);
+  }, []); // Only run on mount, not when projectData changes
 
-  const setProjects = (newProjects: Project[]) => {
-    setProjectData(prev => ({
-      ...prev,
-      projects: newProjects,
-      lastUpdated: new Date().toISOString()
-    }));
+  const setProjects = (newProjects: Project[] | ((prev: Project[]) => Project[])) => {
+    setProjectData(prev => {
+      const projectsToSet = typeof newProjects === 'function' ? newProjects(prev.projects) : newProjects;
+      const updatedData = {
+        ...prev,
+        projects: projectsToSet,
+        lastUpdated: new Date().toISOString(),
+        intentionallyCleared: false // Remove the cleared flag when adding new projects
+      };
+      return updatedData;
+    });
   };
 
-  const setTimelineEvents = (newEvents: TimelineEvent[]) => {
-    setProjectData(prev => ({
-      ...prev,
-      timelineEvents: newEvents,
-      lastUpdated: new Date().toISOString()
-    }));
+  const setTimelineEvents = (newEvents: TimelineEvent[] | ((prev: TimelineEvent[]) => TimelineEvent[])) => {
+    setProjectData(prev => {
+      const eventsToSet = typeof newEvents === 'function' ? newEvents(prev.timelineEvents) : newEvents;
+      return {
+        ...prev,
+        timelineEvents: eventsToSet,
+        lastUpdated: new Date().toISOString(),
+        intentionallyCleared: false // Remove the cleared flag when adding new timeline events
+      };
+    });
   };
 
   const exportUserData = () => {
@@ -270,7 +307,7 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
         projects: importedData.projects.map((project: any) => ({
           ...project,
           deadline: new Date(project.deadline),
-          tasks: project.tasks.map((task: any) => ({
+          tasks: (project.tasks || []).map((task: any) => ({
             ...task,
             dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
             createdAt: new Date(task.createdAt),
@@ -282,7 +319,8 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
           date: new Date(event.date)
         })),
         lastUpdated: new Date().toISOString(),
-        version: importedData.version || "1.0.0"
+        version: importedData.version || "1.0.0",
+        intentionallyCleared: false // Remove the cleared flag when importing data
       };
 
       setProjectData(processedData);
@@ -294,14 +332,26 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
   };
 
   const clearAllData = () => {
+    // Clear the localStorage key completely to ensure no fallback to default data
+    window.localStorage.removeItem('deadline-bloom-data');
+    
     // Reset to completely blank state - no projects, no timeline events
     const resetData: ProjectData = {
       projects: [],
       timelineEvents: [],
       lastUpdated: new Date().toISOString(),
-      version: "1.0.0"
+      version: "1.0.0",
+      intentionallyCleared: true
     };
     setProjectData(resetData);
+  };
+
+  const loadExampleData = () => {
+    setProjectData({
+      ...exampleData,
+      lastUpdated: new Date().toISOString(),
+      intentionallyCleared: false
+    });
   };
 
   return (
@@ -312,7 +362,8 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
       setTimelineEvents,
       exportUserData,
       importUserData,
-      clearAllData
+      clearAllData,
+      loadExampleData
     }}>
       {children}
     </ProjectContext.Provider>
