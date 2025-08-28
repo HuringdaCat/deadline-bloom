@@ -200,8 +200,15 @@ const defaultData: ProjectData = {
 export const ProjectProvider = ({ children }: { children: React.ReactNode }) => {
   const [projectData, setProjectData] = useLocalStorage<ProjectData>('deadline-bloom-data', defaultData);
 
+  // Ensure projectData has the required structure, fallback to defaultData if not
+  const safeProjectData = projectData && 
+    Array.isArray(projectData.projects) && 
+    Array.isArray(projectData.timelineEvents) 
+    ? projectData 
+    : defaultData;
+
   // Convert date strings back to Date objects when loading from localStorage
-  const projects = projectData.projects.map(project => ({
+  const projects = safeProjectData.projects.map(project => ({
     ...project,
     deadline: new Date(project.deadline),
     tasks: project.tasks.map(task => ({
@@ -212,10 +219,18 @@ export const ProjectProvider = ({ children }: { children: React.ReactNode }) => 
     }))
   }));
 
-  const timelineEvents = projectData.timelineEvents.map(event => ({
+  const timelineEvents = safeProjectData.timelineEvents.map(event => ({
     ...event,
     date: new Date(event.date)
   }));
+
+  // Ensure data is properly initialized
+  useEffect(() => {
+    if (!projectData || !projectData.projects || !projectData.timelineEvents) {
+      console.log('Initializing project data with defaults');
+      setProjectData(defaultData);
+    }
+  }, [projectData, setProjectData]);
 
   const setProjects = (newProjects: Project[]) => {
     setProjectData(prev => ({
